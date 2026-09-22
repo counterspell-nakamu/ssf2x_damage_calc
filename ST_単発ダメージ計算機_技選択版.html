@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>スパ2X 単発ダメージ計算機</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:900px;margin:20px auto;padding:0 14px;line-height:1.5}
+h1{font-size:22px}
+.card{border:1px solid #ccc;border-radius:10px;padding:16px;margin:12px 0}
+label{display:block;margin:10px 0 4px;font-weight:bold}
+input,select,button{font-size:16px;padding:8px;box-sizing:border-box}
+input,select{width:100%}
+button{cursor:pointer;margin-top:12px}
+.result{font-size:15px;line-height:1.8}
+.big{font-size:22px;font-weight:bold}
+.note{color:#555;font-size:14px}
+.ok{color:green}.err{color:#b00020}
+
+/* テーブルデザイン */
+.calc-table-container{overflow-x:auto;margin-top:10px}
+table.calc-table{width:100%;border-collapse:collapse;font-family:monospace,sans-serif;font-size:14px}
+table.calc-table th, table.calc-table td{border:1px solid #ccc;padding:8px 6px;text-align:center;white-space:nowrap}
+table.calc-table th{background-color:#f4f4f4;font-weight:bold}
+table.calc-table tr:nth-child(even){background-color:#fafafa}
+table.calc-table tr:hover{background-color:#f0f7ff}
+.hit-val{color:#000;font-weight:bold}
+.guard-val{color:#b00020;font-weight:bold}
+
+.avg-box{margin-top:16px;padding-top:12px;border-top:2px solid #ccc}
+</style>
+</head>
+<body>
+<h1>スパ2X 単発ダメージ計算機</h1>
+
+<div class="card">
+  <label>技データのキャラクターを選択</label>
+  <select id="moveCharSelect"></select>
+
+  <label>技を選択</label>
+  <select id="moveSelect">
+    <option value="">-- 手動入力する --</option>
+  </select>
+  <div class="note" id="moveNote" style="margin-top:4px"></div>
+
+  <label>基本ダメージ</label>
+  <input id="base" type="number" value="32" min="0" step="1">
+
+  <label>ランダム表</label>
+  <select id="table"></select>
+
+  <label>キャラクター補正</label>
+  <select id="char">
+    <option value="27/32">その他（27/32）</option>
+    <option value="25/32">サガット・ベガ・バイソン・T.ホーク・E.本田・ブランカ（25/32）</option>
+    <option value="22/32">ザンギエフ（22/32）</option>
+  </select>
+
+  <label>攻撃を受ける直前のHP</label>
+  <input id="hp" type="number" value="31" min="0" max="144" step="1">
+
+  <button onclick="calculate()">計算</button>
+</div>
+
+<div class="card">
+  <div id="status" class="note"></div>
+  <div id="detail" class="note" style="margin-bottom:10px"></div>
+  <div class="result">
+    <b>【各修飾子の詳細計算結果】</b>
+    <div class="calc-table-container">
+      <table class="calc-table">
+        <thead>
+          <tr>
+            <th>基本</th>
+            <th>修飾子（確率）</th>
+            <th>キャラ補正</th>
+            <th>ライフ補正（ヒット）</th>
+            <th>削り（ガード）</th>
+          </tr>
+        </thead>
+        <tbody id="calcTbody"></tbody>
+      </table>
+    </div>
+    
+    <div class="avg-box">
+      平均ヒットダメージ：<span id="avg" class="big">---</span><br>
+      平均削りダメージ：<span id="avgGuard" class="big">---</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const RANDOM_TABLES = {
+  0:[[-2,3.125],[-1,3.125],[0,78.125],[1,6.25],[2,6.25],[3,3.125]],
+  1:[[-2,3.125],[-1,3.125],[0,68.75],[1,9.375],[2,9.375],[3,6.25]],
+  2:[[-3,3.125],[-2,3.125],[-1,3.125],[0,46.875],[1,12.5],[2,15.625],[3,6.25],[4,9.375]],
+  3:[[-5,3.125],[-4,3.125],[-3,3.125],[-2,3.125],[-1,3.125],[0,37.5],[2,6.25],[3,9.375],[4,12.5],[5,9.375],[6,9.375]],
+  4:[[-5,6.25],[-4,6.25],[-3,3.125],[0,46.875],[4,6.25],[5,6.25],[6,15.625],[7,3.125],[8,6.25]],
+  5:[[-10,12.5],[-8,3.125],[-5,3.125],[0,59.375],[5,3.125],[6,3.125],[8,3.125],[10,12.5]],
+  6:[[-2,3.125],[-1,3.125],[0,71.875],[1,6.25],[2,6.25],[3,6.25],[4,3.125]],
+  7:[[-2,3.125],[-1,3.125],[0,59.375],[1,9.375],[2,9.375],[3,9.375],[4,6.25]],
+  8:[[-3,3.125],[-2,3.125],[-1,3.125],[0,46.875],[1,9.375],[2,6.25],[3,6.25],[4,6.25],[5,6.25],[6,9.375]],
+  9:[[-5,3.125],[-4,3.125],[-3,3.125],[-2,3.125],[-1,3.125],[0,40.625],[3,6.25],[4,15.625],[5,12.5],[6,9.375]],
+  10:[[6,100]],
+  11:[[13,100]],
+  12:[[21,100]],
+  13:[[30,100]],
+  14:[[40,100]],
+  15:[[51,100]],
+  16:[[64,100]],
+  17:[[-8,3.125],[-6,3.125],[-4,6.25],[0,43.75],[4,6.25],[6,6.25],[8,25],[10,6.25]]
+};
+
+function lifeScale(hp){
+  if(hp >= 31) return 1;
+  if(hp >= 26) return 0.875;
+  if(hp >= 21) return 0.75;
+  if(hp >= 16) return 0.625;
+  if(hp >= 11) return 0.50;
+  if(hp >= 6) return 0.375;
+  return 0.25;
+}
+
+function lifeLabel(hp){
+  if(hp >= 31) return "HP31～144：100%";
+  if(hp >= 26) return "HP26～30：87.5%";
+  if(hp >= 21) return "HP21～25：75%";
+  if(hp >= 16) return "HP16～20：62.5%";
+  if(hp >= 11) return "HP11～15：50%";
+  if(hp >= 6) return "HP6～10：37.5%";
+  return "HP0～5：25%";
+}
+
+function calcDamageDetail(base, modifier, charScale, life){
+  const raw = base + modifier;
+  const afterCharRaw = raw * charScale;
+  const afterChar = Math.ceil(afterCharRaw);
+  const afterLifeRaw = afterChar * life;
+  const finalDamage = Math.ceil(afterLifeRaw);
+  
+  const guardRaw = finalDamage / 4;
+  const guardDamage = Math.floor(guardRaw);
+
+  return {
+    raw,
+    afterCharRaw,
+    afterChar,
+    afterLifeRaw,
+    finalDamage,
+    guardRaw,
+    guardDamage
+  };
+}
+
+function parseScale(v){
+  const [a,b] = v.split("/").map(Number);
+  return a/b;
+}
+
+function fmt(n){
+  return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/0+$/,"").replace(/\.$/,"");
+}
+
+// 技データ（supercombo.gg wikiの Damage[Table] 表記から作成。手動入力で追加・修正可）
+// 投げ技などランダム表を使わない技はここには含めていません。
+const MOVE_DATA = {
+  "Ryu": [{"label":"近立弱P（5LP (close)）","damage":4,"table":0},{"label":"遠立弱P（5LP (far)）","damage":4,"table":0},{"label":"近立中P（5MP (close)）","damage":22,"table":0},{"label":"遠立中P（5MP (far)）","damage":22,"table":0},{"label":"近立強P（5HP (close)）","damage":28,"table":1},{"label":"遠立強P（5HP (far)）","damage":28,"table":1},{"label":"近立弱K（5LK (close)）","damage":12,"table":0},{"label":"遠立弱K（5LK (far)）","damage":14,"table":0},{"label":"近立中K（5MK (close)）","damage":24,"table":0},{"label":"遠立中K（5MK (far)）","damage":24,"table":0},{"label":"近立強K（5HK (close)）1段目","damage":30,"table":1},{"label":"近立強K（5HK (close)）2段目","damage":4,"table":1},{"label":"遠立強K（5HK (far)）","damage":30,"table":1},{"label":"しゃがみ弱P（2LP）","damage":4,"table":0},{"label":"しゃがみ中P（2MP）","damage":22,"table":0},{"label":"しゃがみ強P（2HP）：ファーストヒットボックス","damage":28,"table":1},{"label":"しゃがみ強P（2HP）：セカンドヒットボックス","damage":22,"table":1},{"label":"しゃがみ弱K（2LK）","damage":4,"table":0},{"label":"しゃがみ中K（2MK）","damage":22,"table":0},{"label":"しゃがみ強K（足払い）（2HK）","damage":26,"table":1},{"label":"垂直J弱P（8LP）","damage":12,"table":0},{"label":"垂直J中P（8MP）","damage":22,"table":0},{"label":"斜めJ中P（7/9MP）1段目","damage":24,"table":1},{"label":"斜めJ中P（7/9MP）2段目","damage":4,"table":1},{"label":"ジャンプ強P（7/8/9HP）","damage":26,"table":1},{"label":"垂直J弱K（8LK）","damage":14,"table":0},{"label":"斜めJ弱K（7/9LK）","damage":12,"table":0},{"label":"垂直J中K（8MK）","damage":22,"table":0},{"label":"斜めJ中K（7/9MK）","damage":22,"table":0},{"label":"垂直J強K（8HK）：ファーストヒットボックス","damage":28,"table":0},{"label":"垂直J強K（8HK）：セカンドヒットボックス","damage":26,"table":0},{"label":"斜めJ強K（7/9HK）","damage":26,"table":1},{"label":"脳天割り（6MP）1段目","damage":4,"table":0},{"label":"脳天割り（6MP）2段目","damage":28,"table":1},{"label":"みぞおち突き（6HP）1段目","damage":4,"table":0},{"label":"みぞおち突き（6HP）2段目","damage":28,"table":1},{"label":"波動拳（弱）（236LP）","damage":18,"table":0},{"label":"波動拳（中）（236MP）","damage":20,"table":0},{"label":"波動拳（強）（236HP）","damage":22,"table":0},{"label":"灼熱波動拳（弱）（41236LP）","damage":18,"table":0},{"label":"灼熱波動拳（中）（41236MP）","damage":20,"table":0},{"label":"灼熱波動拳（強）（41236HP）","damage":22,"table":0},{"label":"昇龍拳（弱）（623LP）：グラウンドヒットボックス","damage":32,"table":2},{"label":"昇龍拳（弱）（623LP）：ライジングヒットボックス","damage":22,"table":2},{"label":"昇龍拳（中）（623MP）：グラウンドヒットボックス","damage":34,"table":2},{"label":"昇龍拳（中）（623MP）：ライジングヒットボックス","damage":22,"table":2},{"label":"昇龍拳（強）（623HP）：グラウンドヒットボックス","damage":38,"table":2},{"label":"昇龍拳（強）（623HP）：ライジングヒットボックス","damage":22,"table":2},{"label":"竜巻旋風脚（弱）（214LK）","damage":24,"table":1},{"label":"竜巻旋風脚（中）（214MK）","damage":26,"table":1},{"label":"竜巻旋風脚（強）（214HK）","damage":28,"table":1},{"label":"空中竜巻旋風脚（弱）（214LK(空中)）","damage":18,"table":1},{"label":"空中竜巻旋風脚（中）（214MK(空中)）","damage":20,"table":1},{"label":"空中竜巻旋風脚（強）（214HK(空中)）","damage":22,"table":1},{"label":"真空波動拳（236236P）1段目","damage":16,"table":1},{"label":"真空波動拳（236236P）2段目","damage":16,"table":1},{"label":"真空波動拳（236236P）3段目","damage":16,"table":1},{"label":"真空波動拳（236236P）4段目","damage":16,"table":1},{"label":"真空波動拳（236236P）5段目","damage":16,"table":1}]
+
+};
+
+function fillMoveCharSelect(){
+  const sel = document.getElementById("moveCharSelect");
+  sel.innerHTML = "";
+  Object.keys(MOVE_DATA).forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+function fillMoveSelect(){
+  const charKey = document.getElementById("moveCharSelect").value;
+  const sel = document.getElementById("moveSelect");
+  sel.innerHTML = '<option value="">-- 手動入力する --</option>';
+  const moves = MOVE_DATA[charKey] || [];
+  moves.forEach((m, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${m.label}　基本${m.damage} / 表${m.table}`;
+    sel.appendChild(opt);
+  });
+  document.getElementById("moveNote").textContent = "";
+}
+
+function onMoveSelected(){
+  const sel = document.getElementById("moveSelect");
+  const idx = sel.value;
+  const noteEl = document.getElementById("moveNote");
+  if(idx === ""){
+    noteEl.textContent = "";
+    return;
+  }
+  const charKey = document.getElementById("moveCharSelect").value;
+  const m = MOVE_DATA[charKey][Number(idx)];
+  document.getElementById("base").value = m.damage;
+  document.getElementById("table").value = m.table;
+  noteEl.textContent = `${m.label} を選択：基本ダメージ${m.damage}、ランダム表${m.table} を自動入力しました。`;
+  calculate();
+}
+
+function fillTables(){
+  const sel = document.getElementById("table");
+  sel.innerHTML="";
+  for(let i=0;i<=17;i++){
+    const opt=document.createElement("option");
+    opt.value=i;
+    opt.textContent=`表${i}`;
+    sel.appendChild(opt);
+  }
+}
+
+function calculate(){
+  const base=Number(document.getElementById("base").value);
+  const hp=Number(document.getElementById("hp").value);
+  const tableNo=Number(document.getElementById("table").value);
+  const charScale=parseScale(document.getElementById("char").value);
+  const data=RANDOM_TABLES[tableNo];
+
+  if(!Number.isFinite(base) || !Number.isFinite(hp) || hp<0 || hp>144){
+    document.getElementById("status").innerHTML='<span class="err">入力値を確認してください。</span>';
+    return;
+  }
+
+  const life=lifeScale(hp);
+  const total=data.reduce((s,x)=>s+x[1],0);
+
+  document.getElementById("status").innerHTML = `<span class="ok">計算しました（表${tableNo}）</span>`;
+  document.getElementById("detail").innerHTML =
+    `キャラ補正：${charScale} ／ ライフ補正：${life*100}%（${lifeLabel(hp)}）`+
+    ` ／ 確率合計：${fmt(total)}%`;
+
+  let tbodyHtml = "";
+  let weightedHitSum = 0;
+  let weightedGuardSum = 0;
+
+  for(const [m, p] of data){
+    const d = calcDamageDetail(base, m, charScale, life);
+    const modStr = m >= 0 ? `+${m}` : `${m}`;
+    
+    weightedHitSum += d.finalDamage * (p / 100);
+    weightedGuardSum += d.guardDamage * (p / 100);
+
+    tbodyHtml += `<tr>` +
+      `<td>${base}</td>` +
+      `<td>${modStr} (${p}%)</td>` +
+      `<td>= ${fmt(d.raw)} × ${charScale} = ${fmt(d.afterCharRaw)} → ${d.afterChar}</td>` +
+      `<td>${d.afterChar} × ${life} = ${fmt(d.afterLifeRaw)} → <span class="hit-val">${d.finalDamage}</span></td>` +
+      `<td>${d.finalDamage} / 4 = ${fmt(d.guardRaw)} → <span class="guard-val">${d.guardDamage}</span></td>` +
+      `</tr>`;
+  }
+
+  document.getElementById("calcTbody").innerHTML = tbodyHtml;
+  document.getElementById("avg").textContent = fmt(weightedHitSum);
+  document.getElementById("avgGuard").textContent = fmt(weightedGuardSum);
+}
+
+document.getElementById("table").addEventListener("change", calculate);
+document.getElementById("moveSelect").addEventListener("change", onMoveSelected);
+document.getElementById("moveCharSelect").addEventListener("change", fillMoveSelect);
+fillTables();
+fillMoveCharSelect();
+fillMoveSelect();
+calculate();
+</script>
+</body>
+</html>
