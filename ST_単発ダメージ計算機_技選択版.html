@@ -89,6 +89,22 @@ table.calc-table tr:hover{background-color:#f0f7ff}
   </div>
 </div>
 
+<h1 style="font-size:18px;margin-top:28px">投げ技ダメージ計算（ランダム・キャラ補正なし）</h1>
+<div class="card">
+  <label>投げダメージ（固定値）</label>
+  <input id="throwBase" type="number" value="32" min="0" step="1">
+
+  <label>攻撃を受ける直前のHP</label>
+  <input id="throwHp" type="number" value="31" min="0" max="144" step="1">
+
+  <button onclick="calculateThrow()">計算</button>
+
+  <div class="result" style="margin-top:12px">
+    <div id="throwDetail" class="note"></div>
+    投げダメージ：<span id="throwFinal" class="big">---</span>
+  </div>
+</div>
+
 <script>
 const RANDOM_TABLES = {
   0:[[-2,3.125],[-1,3.125],[0,78.125],[1,6.25],[2,6.25],[3,3.125]],
@@ -129,6 +145,25 @@ function lifeLabel(hp){
   if(hp >= 11) return "HP11～15：50%";
   if(hp >= 6) return "HP6～10：37.5%";
   return "HP0～5：25%";
+}
+
+function calculateThrow(){
+  const base = Number(document.getElementById("throwBase").value);
+  const hp = Number(document.getElementById("throwHp").value);
+
+  if(!Number.isFinite(base) || !Number.isFinite(hp) || hp<0 || hp>144){
+    document.getElementById("throwDetail").innerHTML = '<span class="err">入力値を確認してください。</span>';
+    document.getElementById("throwFinal").textContent = "---";
+    return;
+  }
+
+  const life = lifeScale(hp);
+  const finalRaw = base * life;
+  const finalDamage = Math.ceil(finalRaw);
+
+  document.getElementById("throwDetail").innerHTML =
+    `${base} × ${life}（${lifeLabel(hp)}） = ${fmt(finalRaw)} → 切り上げ`;
+  document.getElementById("throwFinal").textContent = finalDamage;
 }
 
 function calcDamageDetail(base, modifier, charScale, life){
@@ -272,6 +307,7 @@ fillTables();
 fillMoveCharSelect();
 fillMoveSelect();
 calculate();
+calculateThrow();
 </script>
 </body>
 </html>
