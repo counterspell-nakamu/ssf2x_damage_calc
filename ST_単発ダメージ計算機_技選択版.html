@@ -2,9 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>スパ2X 単発ダメージ計算機</title>
 <style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{font-family:system-ui,sans-serif;max-width:900px;margin:20px auto;padding:0 14px;line-height:1.5}
 h1{font-size:22px}
 .card{border:1px solid #ccc;border-radius:10px;padding:16px;margin:12px 0}
@@ -91,6 +92,15 @@ table.calc-table tr:hover{background-color:#f0f7ff}
 
 <h1 style="font-size:18px;margin-top:28px">投げ技ダメージ計算（ランダム・キャラ補正なし）</h1>
 <div class="card">
+  <label>投げ技データのキャラクターを選択</label>
+  <select id="throwCharSelect"></select>
+
+  <label>投げ技を選択</label>
+  <select id="throwSelect">
+    <option value="">-- 手動入力する --</option>
+  </select>
+  <div class="note" id="throwMoveNote" style="margin-top:4px"></div>
+
   <label>投げダメージ（固定値）</label>
   <input id="throwBase" type="number" value="32" min="0" step="1">
 
@@ -198,10 +208,9 @@ function fmt(n){
 
 // 技データ（supercombo.gg wikiの Damage[Table] 表記から作成。手動入力で追加・修正可）
 // 投げ技などランダム表を使わない技はここには含めていません。
-const MOVE_DATA = {
-  "Ryu": [{"label":"近立弱P（5LP (close)）","damage":4,"table":0},{"label":"遠立弱P（5LP (far)）","damage":4,"table":0},{"label":"近立中P（5MP (close)）","damage":22,"table":0},{"label":"遠立中P（5MP (far)）","damage":22,"table":0},{"label":"近立強P（5HP (close)）","damage":28,"table":1},{"label":"遠立強P（5HP (far)）","damage":28,"table":1},{"label":"近立弱K（5LK (close)）","damage":12,"table":0},{"label":"遠立弱K（5LK (far)）","damage":14,"table":0},{"label":"近立中K（5MK (close)）","damage":24,"table":0},{"label":"遠立中K（5MK (far)）","damage":24,"table":0},{"label":"近立強K（5HK (close)）1段目","damage":30,"table":1},{"label":"近立強K（5HK (close)）2段目","damage":4,"table":1},{"label":"遠立強K（5HK (far)）","damage":30,"table":1},{"label":"しゃがみ弱P（2LP）","damage":4,"table":0},{"label":"しゃがみ中P（2MP）","damage":22,"table":0},{"label":"しゃがみ強P（2HP）：ファーストヒットボックス","damage":28,"table":1},{"label":"しゃがみ強P（2HP）：セカンドヒットボックス","damage":22,"table":1},{"label":"しゃがみ弱K（2LK）","damage":4,"table":0},{"label":"しゃがみ中K（2MK）","damage":22,"table":0},{"label":"しゃがみ強K（足払い）（2HK）","damage":26,"table":1},{"label":"垂直J弱P（8LP）","damage":12,"table":0},{"label":"垂直J中P（8MP）","damage":22,"table":0},{"label":"斜めJ中P（7/9MP）1段目","damage":24,"table":1},{"label":"斜めJ中P（7/9MP）2段目","damage":4,"table":1},{"label":"ジャンプ強P（7/8/9HP）","damage":26,"table":1},{"label":"垂直J弱K（8LK）","damage":14,"table":0},{"label":"斜めJ弱K（7/9LK）","damage":12,"table":0},{"label":"垂直J中K（8MK）","damage":22,"table":0},{"label":"斜めJ中K（7/9MK）","damage":22,"table":0},{"label":"垂直J強K（8HK）：ファーストヒットボックス","damage":28,"table":0},{"label":"垂直J強K（8HK）：セカンドヒットボックス","damage":26,"table":0},{"label":"斜めJ強K（7/9HK）","damage":26,"table":1},{"label":"脳天割り（6MP）1段目","damage":4,"table":0},{"label":"脳天割り（6MP）2段目","damage":28,"table":1},{"label":"みぞおち突き（6HP）1段目","damage":4,"table":0},{"label":"みぞおち突き（6HP）2段目","damage":28,"table":1},{"label":"波動拳（弱）（236LP）","damage":18,"table":0},{"label":"波動拳（中）（236MP）","damage":20,"table":0},{"label":"波動拳（強）（236HP）","damage":22,"table":0},{"label":"灼熱波動拳（弱）（41236LP）","damage":18,"table":0},{"label":"灼熱波動拳（中）（41236MP）","damage":20,"table":0},{"label":"灼熱波動拳（強）（41236HP）","damage":22,"table":0},{"label":"昇龍拳（弱）（623LP）：グラウンドヒットボックス","damage":32,"table":2},{"label":"昇龍拳（弱）（623LP）：ライジングヒットボックス","damage":22,"table":2},{"label":"昇龍拳（中）（623MP）：グラウンドヒットボックス","damage":34,"table":2},{"label":"昇龍拳（中）（623MP）：ライジングヒットボックス","damage":22,"table":2},{"label":"昇龍拳（強）（623HP）：グラウンドヒットボックス","damage":38,"table":2},{"label":"昇龍拳（強）（623HP）：ライジングヒットボックス","damage":22,"table":2},{"label":"竜巻旋風脚（弱）（214LK）","damage":24,"table":1},{"label":"竜巻旋風脚（中）（214MK）","damage":26,"table":1},{"label":"竜巻旋風脚（強）（214HK）","damage":28,"table":1},{"label":"空中竜巻旋風脚（弱）（214LK(空中)）","damage":18,"table":1},{"label":"空中竜巻旋風脚（中）（214MK(空中)）","damage":20,"table":1},{"label":"空中竜巻旋風脚（強）（214HK(空中)）","damage":22,"table":1},{"label":"真空波動拳（236236P）1段目","damage":16,"table":1},{"label":"真空波動拳（236236P）2段目","damage":16,"table":1},{"label":"真空波動拳（236236P）3段目","damage":16,"table":1},{"label":"真空波動拳（236236P）4段目","damage":16,"table":1},{"label":"真空波動拳（236236P）5段目","damage":16,"table":1}]
+const MOVE_DATA = {"Ryu":[{"label":"近立弱P（5LP (close)）","damage":4,"table":0},{"label":"遠立弱P（5LP (far)）","damage":4,"table":0},{"label":"近立中P（5MP (close)）","damage":22,"table":0},{"label":"遠立中P（5MP (far)）","damage":22,"table":0},{"label":"近立強P（5HP (close)）","damage":28,"table":1},{"label":"遠立強P（5HP (far)）","damage":28,"table":1},{"label":"近立弱K（5LK (close)）","damage":12,"table":0},{"label":"遠立弱K（5LK (far)）","damage":14,"table":0},{"label":"近立中K（5MK (close)）","damage":24,"table":0},{"label":"遠立中K（5MK (far)）","damage":24,"table":0},{"label":"近立強K（5HK (close)）1段目","damage":30,"table":1},{"label":"近立強K（5HK (close)）2段目","damage":4,"table":1},{"label":"遠立強K（5HK (far)）","damage":30,"table":1},{"label":"しゃがみ弱P（2LP）","damage":4,"table":0},{"label":"しゃがみ中P（2MP）","damage":22,"table":0},{"label":"しゃがみ強P（2HP）：ファーストヒットボックス","damage":28,"table":1},{"label":"しゃがみ強P（2HP）：セカンドヒットボックス","damage":22,"table":1},{"label":"しゃがみ弱K（2LK）","damage":4,"table":0},{"label":"しゃがみ中K（2MK）","damage":22,"table":0},{"label":"しゃがみ強K（足払い）（2HK）","damage":26,"table":1},{"label":"垂直J弱P（8LP）","damage":12,"table":0},{"label":"垂直J中P（8MP）","damage":22,"table":0},{"label":"斜めJ中P（7/9MP）1段目","damage":24,"table":1},{"label":"斜めJ中P（7/9MP）2段目","damage":4,"table":1},{"label":"ジャンプ強P（7/8/9HP）","damage":26,"table":1},{"label":"垂直J弱K（8LK）","damage":14,"table":0},{"label":"斜めJ弱K（7/9LK）","damage":12,"table":0},{"label":"垂直J中K（8MK）","damage":22,"table":0},{"label":"斜めJ中K（7/9MK）","damage":22,"table":0},{"label":"垂直J強K（8HK）：ファーストヒットボックス","damage":28,"table":0},{"label":"垂直J強K（8HK）：セカンドヒットボックス","damage":26,"table":0},{"label":"斜めJ強K（7/9HK）","damage":26,"table":1},{"label":"脳天割り（6MP）1段目","damage":4,"table":0},{"label":"脳天割り（6MP）2段目","damage":28,"table":1},{"label":"みぞおち突き（6HP）1段目","damage":4,"table":0},{"label":"みぞおち突き（6HP）2段目","damage":28,"table":1},{"label":"波動拳（弱）（236LP）","damage":18,"table":0},{"label":"波動拳（中）（236MP）","damage":20,"table":0},{"label":"波動拳（強）（236HP）","damage":22,"table":0},{"label":"灼熱波動拳（弱）（41236LP）","damage":18,"table":0},{"label":"灼熱波動拳（中）（41236MP）","damage":20,"table":0},{"label":"灼熱波動拳（強）（41236HP）","damage":22,"table":0},{"label":"昇龍拳（弱）（623LP）：グラウンドヒットボックス","damage":32,"table":2},{"label":"昇龍拳（弱）（623LP）：ライジングヒットボックス","damage":22,"table":2},{"label":"昇龍拳（中）（623MP）：グラウンドヒットボックス","damage":34,"table":2},{"label":"昇龍拳（中）（623MP）：ライジングヒットボックス","damage":22,"table":2},{"label":"昇龍拳（強）（623HP）：グラウンドヒットボックス","damage":38,"table":2},{"label":"昇龍拳（強）（623HP）：ライジングヒットボックス","damage":22,"table":2},{"label":"竜巻旋風脚（弱）（214LK）","damage":24,"table":1},{"label":"竜巻旋風脚（中）（214MK）","damage":26,"table":1},{"label":"竜巻旋風脚（強）（214HK）","damage":28,"table":1},{"label":"空中竜巻旋風脚（弱）（214LK(空中)）","damage":18,"table":1},{"label":"空中竜巻旋風脚（中）（214MK(空中)）","damage":20,"table":1},{"label":"空中竜巻旋風脚（強）（214HK(空中)）","damage":22,"table":1},{"label":"真空波動拳（236236P）1段目","damage":16,"table":1},{"label":"真空波動拳（236236P）2段目","damage":16,"table":1},{"label":"真空波動拳（236236P）3段目","damage":16,"table":1},{"label":"真空波動拳（236236P）4段目","damage":16,"table":1},{"label":"真空波動拳（236236P）5段目","damage":16,"table":1}],"E.Honda":[{"label":"近立弱P（5LP (close)）","damage":20,"table":1},{"label":"遠立弱P（5LP (far)）","damage":20,"table":1},{"label":"近立中P（5MP (close)）","damage":24,"table":1},{"label":"遠立中P（5MP (far)）","damage":24,"table":1},{"label":"近立強P（5HP (close)）","damage":30,"table":2},{"label":"遠立強P（5HP (far)）","damage":30,"table":2},{"label":"近立弱K（5LK (close)）","damage":18,"table":1},{"label":"遠立弱K（5LK (far)）","damage":18,"table":1},{"label":"近立中K（5MK (close)）","damage":22,"table":1},{"label":"遠立中K（5MK (far)）：1段目","damage":4,"table":1},{"label":"遠立中K（5MK (far)）：2段目","damage":24,"table":1},{"label":"立強K（5HK）：1段目","damage":4,"table":2},{"label":"立強K（5HK）：2段目","damage":30,"table":0},{"label":"しゃがみ弱P（2LP）","damage":20,"table":1},{"label":"しゃがみ中P（2MP）","damage":24,"table":1},{"label":"しゃがみ強P（2HP）：1段目","damage":16,"table":2},{"label":"しゃがみ強P（2HP）：2段目","damage":16,"table":2},{"label":"しゃがみ弱K（2LK）","damage":18,"table":1},{"label":"しゃがみ中K（2MK）","damage":22,"table":1},{"label":"しゃがみ強K（2HK）","damage":32,"table":2},{"label":"垂直J弱P（8LP）","damage":20,"table":1},{"label":"斜めJ弱P（7/9LP）","damage":12,"table":0},{"label":"垂直J中P（8MP）","damage":22,"table":1},{"label":"斜めJ中P（7/9MP）","damage":22,"table":2},{"label":"垂直J強P（8HP）","damage":32,"table":2},{"label":"斜めJ強P（7/9HP）","damage":30,"table":2},{"label":"垂直J弱K（8LK）","damage":16,"table":1},{"label":"斜めJ弱K（7/9LK）","damage":16,"table":1},{"label":"ジャンプ中K（垂直/斜め共通）（8MK）","damage":22,"table":1},{"label":"垂直J強K（8HK）","damage":30,"table":2},{"label":"斜めJ強K（7/9HK）","damage":30,"table":2},{"label":"膝蹴り（cl.4/6MK）：1段目","damage":26,"table":1},{"label":"膝蹴り（cl.4/6MK）：2段目","damage":16,"table":1},{"label":"コマンド足払い（4/6HK）","damage":28,"table":2},{"label":"飛び百貫落とし（2MK（斜めジャンプ中））","damage":24,"table":2},{"label":"オイチョ投げ（弱）（6324LP）：1段目","damage":16,"table":1},{"label":"オイチョ投げ（弱）（6324LP）：2段目","damage":28,"table":1},{"label":"オイチョ投げ（中）（6324MP）：1段目","damage":18,"table":1},{"label":"オイチョ投げ（中）（6324MP）：2段目","damage":30,"table":1},{"label":"オイチョ投げ（強）（6324HP）：1段目","damage":20,"table":1},{"label":"オイチョ投げ（強）（6324HP）：2段目","damage":32,"table":1},{"label":"百裂張り手（弱）(Mid)（LP連打）","damage":24,"table":1},{"label":"百裂張り手（弱）(Low)（LP連打）","damage":22,"table":1},{"label":"百裂張り手（中）(Mid)（MP連打）","damage":26,"table":2},{"label":"百裂張り手（中）(Low)（MP連打）","damage":24,"table":2},{"label":"百裂張り手（強）(Mid)（HP連打）","damage":28,"table":3},{"label":"百裂張り手（強）(Low)（HP連打）","damage":26,"table":3},{"label":"頭突き（弱）（[4]6LP）：1段目","damage":28,"table":1},{"label":"頭突き（弱）（[4]6LP）：2段目","damage":28,"table":2},{"label":"頭突き（中）（[4]6MP）：1段目","damage":30,"table":2},{"label":"頭突き（中）（[4]6MP）：2段目","damage":30,"table":3},{"label":"頭突き（強）（[4]6HP）：1段目","damage":32,"table":3},{"label":"頭突き（強）（[4]6HP）：2段目","damage":32,"table":4},{"label":"スモウスマッシュ（弱）（[2]8LK）","damage":24,"table":2},{"label":"スモウスマッシュ（中）（[2]8MK）","damage":28,"table":2},{"label":"スモウスマッシュ（強）（[2]8HK）","damage":32,"table":2},{"label":"スーパーキラーヘッドラム（[4]646P）1段目","damage":20,"table":2},{"label":"スーパーキラーヘッドラム（[4]646P）2段目","damage":20,"table":2},{"label":"スーパーキラーヘッドラム（[4]646P）3段目","damage":20,"table":2},{"label":"スーパーキラーヘッドラム（[4]646P）4段目","damage":20,"table":2}]};
 
-};
+const THROW_DATA = {"Ryu":[{"label":"背負い投げ（cl.4/6 + MP/HP）","damage":32},{"label":"巴投げ（cl.4/6 + MK/HK）","damage":32}],"E.Honda":[{"label":"背負い投げ（cl.4/6+MP）","damage":32},{"label":"さばおり（抱え込み投げ）（cl.4/6+HP）","damage":24},{"label":"関取蹴り（抱え込み投げ）（cl.4/6+HK）","damage":24}]};
 
 function fillMoveCharSelect(){
   const sel = document.getElementById("moveCharSelect");
@@ -242,6 +251,46 @@ function onMoveSelected(){
   document.getElementById("table").value = m.table;
   noteEl.textContent = `${m.label} を選択：基本ダメージ${m.damage}、ランダム表${m.table} を自動入力しました。`;
   calculate();
+}
+
+function fillThrowCharSelect(){
+  const sel = document.getElementById("throwCharSelect");
+  sel.innerHTML = "";
+  Object.keys(THROW_DATA).forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+function fillThrowSelect(){
+  const charKey = document.getElementById("throwCharSelect").value;
+  const sel = document.getElementById("throwSelect");
+  sel.innerHTML = '<option value="">-- 手動入力する --</option>';
+  const throws = THROW_DATA[charKey] || [];
+  throws.forEach((t, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${t.label}　固定${t.damage}`;
+    sel.appendChild(opt);
+  });
+  document.getElementById("throwMoveNote").textContent = "";
+}
+
+function onThrowSelected(){
+  const sel = document.getElementById("throwSelect");
+  const idx = sel.value;
+  const noteEl = document.getElementById("throwMoveNote");
+  if(idx === ""){
+    noteEl.textContent = "";
+    return;
+  }
+  const charKey = document.getElementById("throwCharSelect").value;
+  const t = THROW_DATA[charKey][Number(idx)];
+  document.getElementById("throwBase").value = t.damage;
+  noteEl.textContent = `${t.label} を選択：固定ダメージ${t.damage}を自動入力しました。`;
+  calculateThrow();
 }
 
 function fillTables(){
@@ -303,9 +352,13 @@ function calculate(){
 document.getElementById("table").addEventListener("change", calculate);
 document.getElementById("moveSelect").addEventListener("change", onMoveSelected);
 document.getElementById("moveCharSelect").addEventListener("change", fillMoveSelect);
+document.getElementById("throwSelect").addEventListener("change", onThrowSelected);
+document.getElementById("throwCharSelect").addEventListener("change", fillThrowSelect);
 fillTables();
 fillMoveCharSelect();
 fillMoveSelect();
+fillThrowCharSelect();
+fillThrowSelect();
 calculate();
 calculateThrow();
 </script>
