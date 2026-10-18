@@ -212,7 +212,10 @@ function calcDamageDetail(base, modifier, charScale, life){
   const finalDamage = Math.ceil(afterLifeRaw);
   
   const guardRaw = finalDamage / 4;
-  const guardDamage = Math.floor(guardRaw);
+  const guardFloor = Math.floor(guardRaw);
+  // 削りは最低1保証（ヒットダメージが0のときだけ0）
+  const guardMinApplied = (finalDamage > 0 && guardFloor < 1);
+  const guardDamage = guardMinApplied ? 1 : guardFloor;
 
   return {
     raw,
@@ -221,6 +224,8 @@ function calcDamageDetail(base, modifier, charScale, life){
     afterLifeRaw,
     finalDamage,
     guardRaw,
+    guardFloor,
+    guardMinApplied,
     guardDamage
   };
 }
@@ -382,7 +387,7 @@ function calculate(){
       `<td>${modStr} (${p}%)</td>` +
       `<td>= ${fmt(d.raw)} × ${charScale} = ${fmt(d.afterCharRaw)} → ${d.afterChar}</td>` +
       `<td>${d.afterChar} × ${life} = ${fmt(d.afterLifeRaw)} → <span class="hit-val">${d.finalDamage}</span></td>` +
-      (noChip ? "" : `<td>${d.finalDamage} / 4 = ${fmt(d.guardRaw)} → <span class="guard-val">${d.guardDamage}</span></td>`) +
+      (noChip ? "" : `<td>${d.finalDamage} / 4 = ${fmt(d.guardRaw)} → ${d.guardMinApplied ? d.guardFloor + " → 最低1で " : ""}<span class="guard-val">${d.guardDamage}</span></td>`) +
       `</tr>`;
   }
 
